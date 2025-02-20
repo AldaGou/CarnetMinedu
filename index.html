@@ -24,8 +24,7 @@
     }
     .crop-area img {
       position: absolute;
-      top: 0;
-      left: 0;
+      cursor: grab;
     }
     button {
       padding: 10px 20px;
@@ -47,7 +46,6 @@
       <img id="uploadedImage" src="" alt="">
     </div>
     <button onclick="processImage()" id="processButton" disabled>Procesar Imagen</button>
-    <p id="error" style="color: red; display: none;"></p>
   </div>
 
   <script>
@@ -56,7 +54,10 @@
     const cropArea = document.getElementById('cropArea');
     const processButton = document.getElementById('processButton');
 
-    let cropData = { x: 0, y: 0, width: 240, height: 288 };
+    let isDragging = false;
+    let startX, startY;
+    let imgX = 0, imgY = 0;
+    let scale = 1;
 
     fileInput.addEventListener('change', (event) => {
       const file = event.target.files[0];
@@ -64,30 +65,45 @@
         const reader = new FileReader();
         reader.onload = () => {
           uploadedImage.src = reader.result;
-          uploadedImage.style.width = 'auto';
-          uploadedImage.style.height = '100%';
+          uploadedImage.style.transform = `translate(0px, 0px) scale(1)`;
+          imgX = 0;
+          imgY = 0;
+          scale = 1;
           processButton.disabled = false;
         };
         reader.readAsDataURL(file);
       }
     });
 
-    cropArea.addEventListener('mousedown', (event) => {
-      const startX = event.offsetX;
-      const startY = event.offsetY;
-      const onMouseMove = (e) => {
-        const dx = e.offsetX - startX;
-        const dy = e.offsetY - startY;
-        cropData.x += dx;
-        cropData.y += dy;
-        uploadedImage.style.transform = `translate(${cropData.x}px, ${cropData.y}px)`;
-      };
-      const onMouseUp = () => {
-        cropArea.removeEventListener('mousemove', onMouseMove);
-        cropArea.removeEventListener('mouseup', onMouseUp);
-      };
-      cropArea.addEventListener('mousemove', onMouseMove);
-      cropArea.addEventListener('mouseup', onMouseUp);
+    uploadedImage.addEventListener('mousedown', (event) => {
+      isDragging = true;
+      startX = event.clientX - imgX;
+      startY = event.clientY - imgY;
+      uploadedImage.style.cursor = 'grabbing';
+    });
+
+    document.addEventListener('mousemove', (event) => {
+      if (isDragging) {
+        imgX = event.clientX - startX;
+        imgY = event.clientY - startY;
+        uploadedImage.style.transform = `translate(${imgX}px, ${imgY}px) scale(${scale})`;
+      }
+    });
+
+    document.addEventListener('mouseup', () => {
+      isDragging = false;
+      uploadedImage.style.cursor = 'grab';
+    });
+
+    cropArea.addEventListener('wheel', (event) => {
+      event.preventDefault();
+      const zoomStep = 0.1;
+      if (event.deltaY < 0) {
+        scale += zoomStep;
+      } else {
+        scale = Math.max(1, scale - zoomStep);
+      }
+      uploadedImage.style.transform = `translate(${imgX}px, ${imgY}px) scale(${scale})`;
     });
 
     function processImage() {
@@ -95,45 +111,27 @@
       canvas.width = 240;
       canvas.height = 288;
       const ctx = canvas.getContext('2d');
+
       const img = new Image();
       img.src = uploadedImage.src;
 
       img.onload = () => {
+        const imgWidth = img.width * scale;
+        const imgHeight = img.height * scale;
+
+        const offsetX = (cropArea.offsetWidth / 2) - (imgWidth / 2) - imgX;
+        const offsetY = (cropArea.offsetHeight / 2) - (imgHeight / 2) - imgY;
+
         ctx.drawImage(
           img,
-          cropData.x, cropData.y, cropData.width, cropData.height,
-          0, 0, 240, 288
+          offsetX, offsetY, imgWidth, imgHeight,
+          0, 0, canvas.width, canvas.height
         );
 
         canvas.toBlob((blob) => {
-          compressImage(blob, 1);
+          downloadImage(blob);
         }, 'image/jpeg', 1);
       };
-    }
-
-    function compressImage(blob, quality) {
-      const reader = new FileReader();
-      reader.onload = () => {
-        const img = new Image();
-        img.src = reader.result;
-
-        img.onload = () => {
-          const canvas = document.createElement('canvas');
-          canvas.width = 240;
-          canvas.height = 288;
-          const ctx = canvas.getContext('2d');
-          ctx.drawImage(img, 0, 0, 240, 288);
-
-          canvas.toBlob((compressedBlob) => {
-            if (compressedBlob.size > 50 * 1024 && quality > 0.1) {
-              compressImage(compressedBlob, quality - 0.1);
-            } else {
-              downloadImage(compressedBlob);
-            }
-          }, 'image/jpeg', quality);
-        };
-      };
-      reader.readAsDataURL(blob);
     }
 
     function downloadImage(blob) {
