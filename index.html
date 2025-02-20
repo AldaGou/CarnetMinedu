@@ -1,117 +1,117 @@
-import React, { useRef, useState } from "react";
-import { Button } from "@/components/ui/button";
-import Cropper from "react-easy-crop";
-import { getCroppedImg } from "./utils/cropImage";
-
-const ImageProcessor = () => {
-  const fileInputRef = useRef(null);
-  const [imageSrc, setImageSrc] = useState(null);
-  const [croppedAreaPixels, setCroppedAreaPixels] = useState(null);
-  const [crop, setCrop] = useState({ x: 0, y: 0 });
-  const [zoom, setZoom] = useState(1);
-
-  const onFileChange = (e) => {
-    const file = e.target.files[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onload = () => setImageSrc(reader.result);
-      reader.readAsDataURL(file);
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Procesador de Imágenes</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 20px;
     }
-  };
-
-  const onCropComplete = (croppedArea, croppedAreaPixels) => {
-    setCroppedAreaPixels(croppedAreaPixels);
-  };
-
-  const processImage = async () => {
-    if (!croppedAreaPixels || !imageSrc) return;
-
-    const croppedImage = await getCroppedImg(imageSrc, croppedAreaPixels, 300);
-    const blob = await fetch(croppedImage).then((res) => res.blob());
-
-    if (blob.size > 50 * 1024) {
-      alert("La imagen procesada excede los 50KB. Prueba recortando más o reduciendo detalles.");
-      return;
+    .container {
+      max-width: 600px;
+      margin: 0 auto;
+      text-align: center;
     }
-
-    const downloadLink = document.createElement("a");
-    downloadLink.href = croppedImage;
-    downloadLink.download = "processed-image.png";
-    downloadLink.click();
-  };
-
-  return (
-    <div className="p-4">
-      <h1 className="text-xl font-bold mb-4">Procesador de Imágenes</h1>
-      <input
-        type="file"
-        accept="image/*"
-        ref={fileInputRef}
-        className="hidden"
-        onChange={onFileChange}
-      />
-      <Button onClick={() => fileInputRef.current.click()}>Cargar Imagen</Button>
-
-      {imageSrc && (
-        <div className="relative mt-4" style={{ width: 240, height: 288 }}>
-          <Cropper
-            image={imageSrc}
-            crop={crop}
-            zoom={zoom}
-            aspect={240 / 288}
-            onCropChange={setCrop}
-            onZoomChange={setZoom}
-            onCropComplete={onCropComplete}
-          />
-        </div>
-      )}
-
-      <Button
-        onClick={processImage}
-        disabled={!imageSrc}
-        className="mt-4"
-      >
-        Procesar Imagen
-      </Button>
+    .crop-area {
+      position: relative;
+      margin: 20px auto;
+      width: 300px;
+      height: 300px;
+      border: 1px solid #ccc;
+      overflow: hidden;
+    }
+    .crop-area img {
+      position: absolute;
+      top: 0;
+      left: 0;
+    }
+    button {
+      padding: 10px 20px;
+      margin: 10px;
+      font-size: 16px;
+      cursor: pointer;
+    }
+    input[type="file"] {
+      display: none;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Procesador de Imágenes</h1>
+    <input type="file" id="fileInput" accept="image/*">
+    <button onclick="document.getElementById('fileInput').click()">Cargar Imagen</button>
+    <div class="crop-area" id="cropArea">
+      <img id="uploadedImage" src="" alt="">
     </div>
-  );
-};
+    <button onclick="processImage()" id="processButton" disabled>Procesar Imagen</button>
+  </div>
 
-export default ImageProcessor;
+  <script>
+    const fileInput = document.getElementById('fileInput');
+    const uploadedImage = document.getElementById('uploadedImage');
+    const cropArea = document.getElementById('cropArea');
+    const processButton = document.getElementById('processButton');
 
-// utils/cropImage.js
-export const getCroppedImg = (imageSrc, crop, dpi = 300) => {
-  const canvas = document.createElement("canvas");
-  const scale = dpi / 96;
+    let cropData = { x: 0, y: 0, width: 300, height: 300 };
 
-  canvas.width = crop.width * scale;
-  canvas.height = crop.height * scale;
-  const ctx = canvas.getContext("2d");
+    fileInput.addEventListener('change', (event) => {
+      const file = event.target.files[0];
+      if (file) {
+        const reader = new FileReader();
+        reader.onload = () => {
+          uploadedImage.src = reader.result;
+          uploadedImage.style.width = 'auto';
+          uploadedImage.style.height = '100%';
+          processButton.disabled = false;
+        };
+        reader.readAsDataURL(file);
+      }
+    });
 
-  const img = new Image();
-  img.src = imageSrc;
+    cropArea.addEventListener('mousedown', (event) => {
+      const startX = event.offsetX;
+      const startY = event.offsetY;
+      const onMouseMove = (e) => {
+        const dx = e.offsetX - startX;
+        const dy = e.offsetY - startY;
+        cropData.x += dx;
+        cropData.y += dy;
+        uploadedImage.style.transform = `translate(${cropData.x}px, ${cropData.y}px)`;
+      };
+      const onMouseUp = () => {
+        cropArea.removeEventListener('mousemove', onMouseMove);
+        cropArea.removeEventListener('mouseup', onMouseUp);
+      };
+      cropArea.addEventListener('mousemove', onMouseMove);
+      cropArea.addEventListener('mouseup', onMouseUp);
+    });
 
-  return new Promise((resolve) => {
-    img.onload = () => {
-      ctx.drawImage(
-        img,
-        crop.x * scale,
-        crop.y * scale,
-        crop.width * scale,
-        crop.height * scale,
-        0,
-        0,
-        canvas.width,
-        canvas.height
-      );
+    function processImage() {
+      const canvas = document.createElement('canvas');
+      canvas.width = cropData.width;
+      canvas.height = cropData.height;
+      const ctx = canvas.getContext('2d');
+      const img = new Image();
+      img.src = uploadedImage.src;
 
-      canvas.toBlob(
-        (blob) => {
-          resolve(URL.createObjectURL(blob));
-        },
-        "image/png",
-        1
-      );
-    };
-  });
-};
+      img.onload = () => {
+        ctx.drawImage(
+          img,
+          cropData.x, cropData.y, cropData.width, cropData.height,
+          0, 0, cropData.width, cropData.height
+        );
+
+        canvas.toBlob((blob) => {
+          const link = document.createElement('a');
+          link.href = URL.createObjectURL(blob);
+          link.download = 'processed-image.png';
+          link.click();
+        }, 'image/png');
+      };
+    }
+  </script>
+</body>
+</html>
