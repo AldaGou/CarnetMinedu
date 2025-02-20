@@ -1,170 +1,189 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Procesador de Imágenes</title>
-  <style>
-    body {
-      font-family: Arial, sans-serif;
-      margin: 20px;
-      text-align: center;
-    }
-    .container {
-      max-width: 700px;
-      margin: 0 auto;
-    }
-    .image-container {
-      position: relative;
-      width: 500px;
-      height: 500px;
-      margin: 20px auto;
-      border: 1px solid #ccc;
-      overflow: hidden;
-      background-color: #f0f0f0;
-    }
-    .image-container img {
-      position: absolute;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-      max-width: 100%;
-      max-height: 100%;
-      cursor: grab;
-      transition: transform 0.2s ease;
-    }
-    .crop-box {
-      position: absolute;
-      width: 240px;
-      height: 288px;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-      border: 2px solid #000;
-      pointer-events: none;
-      box-shadow: 0 0 0 10000px rgba(0, 0, 0, 0.5);
-    }
-    button {
-      padding: 10px 20px;
-      margin: 10px;
-      font-size: 16px;
-      cursor: pointer;
-    }
-    input[type="file"] {
-      display: none;
-    }
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Procesador de Imágenes</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        #image-container {
+            position: relative;
+            width: 400px;
+            height: 400px;
+            background-color: #f0f0f0;
+            overflow: hidden;
+            display: none;
+        }
+
+        #image {
+            position: absolute;
+            top: 0;
+            left: 0;
+            user-select: none;
+            cursor: grab;
+        }
+
+        #crop-area {
+            position: absolute;
+            width: 200px;
+            height: 200px;
+            border: 2px dashed #000;
+            pointer-events: none;
+            box-sizing: border-box;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+        }
+
+        input[type="range"] {
+            margin: 10px 0;
+        }
+
+        button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            cursor: pointer;
+            border-radius: 5px;
+        }
+
+        button:hover {
+            background-color: #0056b3;
+        }
+    </style>
 </head>
 <body>
-  <div class="container">
     <h1>Procesador de Imágenes</h1>
-    <input type="file" id="fileInput" accept="image/*">
-    <button onclick="document.getElementById('fileInput').click()">Cargar Imagen</button>
-    <div class="image-container" id="imageContainer">
-      <img id="uploadedImage" src="" alt="">
-      <div class="crop-box"></div>
+    <div class="container">
+        <button id="upload-button">Cargar Imagen</button>
+        <input type="file" id="file-input" accept="image/*" style="display: none;">
+
+        <div id="image-container">
+            <img id="image" src="" alt="Cargando imagen...">
+            <div id="crop-area"></div>
+        </div>
+
+        <input type="range" id="zoom-slider" min="1" max="3" step="0.1" value="1" style="display: none;">
+        <button id="process-button" style="display: none;">Procesar Imagen</button>
     </div>
-    <button onclick="processImage()" id="processButton" disabled>Procesar Imagen</button>
-  </div>
 
-  <script>
-    const fileInput = document.getElementById('fileInput');
-    const uploadedImage = document.getElementById('uploadedImage');
-    const imageContainer = document.getElementById('imageContainer');
-    const cropBox = document.querySelector('.crop-box');
-    const processButton = document.getElementById('processButton');
+    <script>
+        const uploadButton = document.getElementById('upload-button');
+        const fileInput = document.getElementById('file-input');
+        const imageContainer = document.getElementById('image-container');
+        const image = document.getElementById('image');
+        const cropArea = document.getElementById('crop-area');
+        const zoomSlider = document.getElementById('zoom-slider');
+        const processButton = document.getElementById('process-button');
 
-    let scale = 1;
-    let posX = 0, posY = 0;
-    let isDragging = false;
-    let startX, startY;
+        let scale = 1;
+        let posX = 0;
+        let posY = 0;
+        let startX = 0;
+        let startY = 0;
 
-    fileInput.addEventListener('change', (event) => {
-      const file = event.target.files[0];
-      if (file) {
-        const reader = new FileReader();
-        reader.onload = () => {
-          uploadedImage.src = reader.result;
-          uploadedImage.style.transform = 'translate(-50%, -50%) scale(1)';
-          scale = 1;
-          posX = 0;
-          posY = 0;
-          processButton.disabled = false;
-        };
-        reader.readAsDataURL(file);
-      }
-    });
+        uploadButton.addEventListener('click', () => fileInput.click());
 
-    // Allow dragging the image
-    uploadedImage.addEventListener('mousedown', (event) => {
-      isDragging = true;
-      startX = event.clientX - posX;
-      startY = event.clientY - posY;
-      uploadedImage.style.cursor = 'grabbing';
-    });
+        fileInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = () => {
+                    image.src = reader.result;
+                    image.onload = () => {
+                        image.style.transform = `scale(1)`;
+                        scale = 1;
+                        posX = 0;
+                        posY = 0;
+                        image.style.left = '0';
+                        image.style.top = '0';
+                        imageContainer.style.display = 'block';
+                        zoomSlider.style.display = 'block';
+                        processButton.style.display = 'block';
+                    };
+                };
+                reader.readAsDataURL(file);
+            }
+        });
 
-    document.addEventListener('mousemove', (event) => {
-      if (isDragging) {
-        posX = event.clientX - startX;
-        posY = event.clientY - startY;
-        uploadedImage.style.transform = `translate(calc(-50% + ${posX}px), calc(-50% + ${posY}px)) scale(${scale})`;
-      }
-    });
+        image.addEventListener('mousedown', (e) => {
+            startX = e.clientX - posX;
+            startY = e.clientY - posY;
+            image.style.cursor = 'grabbing';
 
-    document.addEventListener('mouseup', () => {
-      isDragging = false;
-      uploadedImage.style.cursor = 'grab';
-    });
+            const onMouseMove = (e) => {
+                posX = e.clientX - startX;
+                posY = e.clientY - startY;
+                image.style.transform = `translate(${posX}px, ${posY}px) scale(${scale})`;
+            };
 
-    // Allow zooming the image
-    imageContainer.addEventListener('wheel', (event) => {
-      event.preventDefault();
-      const zoomAmount = 0.1;
-      if (event.deltaY < 0) {
-        scale = Math.min(scale + zoomAmount, 5); // Max zoom level
-      } else {
-        scale = Math.max(scale - zoomAmount, 1); // Min zoom level
-      }
-      uploadedImage.style.transform = `translate(calc(-50% + ${posX}px), calc(-50% + ${posY}px)) scale(${scale})`;
-    });
+            const onMouseUp = () => {
+                image.style.cursor = 'grab';
+                window.removeEventListener('mousemove', onMouseMove);
+                window.removeEventListener('mouseup', onMouseUp);
+            };
 
-    function processImage() {
-      const canvas = document.createElement('canvas');
-      const cropWidth = cropBox.offsetWidth;
-      const cropHeight = cropBox.offsetHeight;
-      canvas.width = cropWidth;
-      canvas.height = cropHeight;
+            window.addEventListener('mousemove', onMouseMove);
+            window.addEventListener('mouseup', onMouseUp);
+        });
 
-      const ctx = canvas.getContext('2d');
+        zoomSlider.addEventListener('input', (e) => {
+            scale = e.target.value;
+            image.style.transform = `translate(${posX}px, ${posY}px) scale(${scale})`;
+        });
 
-      const img = new Image();
-      img.src = uploadedImage.src;
+        processButton.addEventListener('click', () => {
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
 
-      img.onload = () => {
-        const scaleX = img.width / uploadedImage.clientWidth;
-        const scaleY = img.height / uploadedImage.clientHeight;
+            const cropRect = cropArea.getBoundingClientRect();
+            const imgRect = image.getBoundingClientRect();
 
-        const offsetX = ((cropBox.offsetLeft - (imageContainer.clientWidth / 2 - posX)) / scale) * scaleX;
-        const offsetY = ((cropBox.offsetTop - (imageContainer.clientHeight / 2 - posY)) / scale) * scaleY;
+            const scaleX = image.naturalWidth / imgRect.width;
+            const scaleY = image.naturalHeight / imgRect.height;
 
-        ctx.drawImage(
-          img,
-          offsetX, offsetY, cropWidth * scaleX / scale, cropHeight * scaleY / scale,
-          0, 0, canvas.width, canvas.height
-        );
+            const cropX = (cropRect.left - imgRect.left) * scaleX;
+            const cropY = (cropRect.top - imgRect.top) * scaleY;
+            const cropWidth = cropRect.width * scaleX;
+            const cropHeight = cropRect.height * scaleY;
 
-        canvas.toBlob((blob) => {
-          downloadImage(blob);
-        }, 'image/jpeg', 1);
-      };
-    }
+            canvas.width = cropWidth;
+            canvas.height = cropHeight;
 
-    function downloadImage(blob) {
-      const link = document.createElement('a');
-      link.href = URL.createObjectURL(blob);
-      link.download = 'processed-image.jpg';
-      link.click();
-    }
-  </script>
+            ctx.drawImage(
+                image,
+                cropX,
+                cropY,
+                cropWidth,
+                cropHeight,
+                0,
+                0,
+                cropWidth,
+                cropHeight
+            );
+
+            canvas.toBlob((blob) => {
+                const link = document.createElement('a');
+                link.href = URL.createObjectURL(blob);
+                link.download = 'processed-image.png';
+                link.click();
+            });
+        });
+    </script>
 </body>
 </html>
