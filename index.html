@@ -32,10 +32,14 @@
     }
     .crop-box {
       position: absolute;
+      border: 2px dashed #000;
+      resize: both;
+      overflow: hidden;
+      min-width: 50px;
+      min-height: 50px;
       width: 240px;
       height: 288px;
-      border: 2px dashed #000;
-      pointer-events: none;
+      cursor: move;
     }
     button {
       padding: 10px 20px;
@@ -67,7 +71,7 @@
     const cropBox = document.getElementById('cropBox');
     const processButton = document.getElementById('processButton');
 
-    let cropBoxX = 130, cropBoxY = 106; // Posición inicial del cuadro de recorte
+    let cropBoxX = 130, cropBoxY = 106;
     let imageX = 0, imageY = 0;
     let isDraggingImage = false;
     let isDraggingCropBox = false;
@@ -122,8 +126,11 @@
 
     function processImage() {
       const canvas = document.createElement('canvas');
-      canvas.width = 240;
-      canvas.height = 288;
+      const cropWidth = cropBox.offsetWidth;
+      const cropHeight = cropBox.offsetHeight;
+      canvas.width = cropWidth;
+      canvas.height = cropHeight;
+
       const ctx = canvas.getContext('2d');
 
       const img = new Image();
@@ -133,14 +140,12 @@
         const scaleX = img.width / uploadedImage.clientWidth;
         const scaleY = img.height / uploadedImage.clientHeight;
 
-        const offsetX = (cropBoxX - imageX) * scaleX;
-        const offsetY = (cropBoxY - imageY) * scaleY;
-        const cropWidth = 240 * scaleX;
-        const cropHeight = 288 * scaleY;
+        const offsetX = (cropBox.offsetLeft - imageX) * scaleX;
+        const offsetY = (cropBox.offsetTop - imageY) * scaleY;
 
         ctx.drawImage(
           img,
-          offsetX, offsetY, cropWidth, cropHeight,
+          offsetX, offsetY, cropWidth * scaleX, cropHeight * scaleY,
           0, 0, canvas.width, canvas.height
         );
 
