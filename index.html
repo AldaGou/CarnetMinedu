@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Editor de Imágenes</title>
+  <title>Editor de Imágenes con Recorte</title>
   <style>
     body {
       font-family: Arial, sans-serif;
@@ -11,12 +11,13 @@
       padding: 20px;
     }
     .container {
-      max-width: 500px;
+      max-width: 700px;
       margin: 0 auto;
     }
     canvas {
       border: 1px solid #ddd;
       margin-top: 20px;
+      cursor: crosshair;
     }
     input, button {
       margin-top: 10px;
@@ -25,27 +26,29 @@
 </head>
 <body>
   <div class="container">
-    <h1>Editor de Imágenes</h1>
-    <p>Sube una imagen para ajustarla según los parámetros:</p>
+    <h1>Editor de Imágenes con Recorte</h1>
+    <p>Sube una imagen y selecciona el área que deseas procesar:</p>
     <ul>
-      <li><strong>Tamaño:</strong> Máximo 50 KB</li>
-      <li><strong>Dimensiones:</strong> 240x288 píxeles</li>
+      <li><strong>Dimensiones del recorte:</strong> 240x288 píxeles</li>
+      <li><strong>Tamaño máximo de archivo:</strong> 50 KB</li>
       <li><strong>Resolución:</strong> 300 DPI</li>
     </ul>
     <input type="file" id="imageInput" accept="image/*">
-    <button id="processButton">Procesar Imagen</button>
     <canvas id="canvas"></canvas>
-    <a id="downloadLink" style="display:none;">Descargar Imagen</a>
+    <button id="processButton">Procesar Imagen</button>
+    <a id="downloadLink" style="display:none;">Descargar Imagen Procesada</a>
   </div>
 
   <script>
     const imageInput = document.getElementById('imageInput');
     const processButton = document.getElementById('processButton');
     const canvas = document.getElementById('canvas');
-    const downloadLink = document.getElementById('downloadLink');
     const ctx = canvas.getContext('2d');
+    const downloadLink = document.getElementById('downloadLink');
 
     let img = new Image();
+    let isDragging = false;
+    let selection = { x: 0, y: 0, width: 240, height: 288 }; // Dimensiones del recorte
 
     imageInput.addEventListener('change', (event) => {
       const file = event.target.files[0];
@@ -59,12 +62,38 @@
     });
 
     img.onload = () => {
-      // Ajustar el tamaño del canvas a las dimensiones requeridas
-      canvas.width = 240;
-      canvas.height = 288;
+      // Ajustar el canvas al tamaño de la imagen cargada
+      canvas.width = img.width;
+      canvas.height = img.height;
+      ctx.drawImage(img, 0, 0);
+    };
 
-      // Dibujar la imagen redimensionada en el canvas
-      ctx.drawImage(img, 0, 0, 240, 288);
+    canvas.addEventListener('mousedown', (e) => {
+      isDragging = true;
+      const rect = canvas.getBoundingClientRect();
+      selection.x = e.clientX - rect.left;
+      selection.y = e.clientY - rect.top;
+      drawSelection();
+    });
+
+    canvas.addEventListener('mousemove', (e) => {
+      if (isDragging) {
+        const rect = canvas.getBoundingClientRect();
+        selection.x = e.clientX - rect.left - selection.width / 2;
+        selection.y = e.clientY - rect.top - selection.height / 2;
+        ctx.drawImage(img, 0, 0);
+        drawSelection();
+      }
+    });
+
+    canvas.addEventListener('mouseup', () => {
+      isDragging = false;
+    });
+
+    const drawSelection = () => {
+      ctx.strokeStyle = 'red';
+      ctx.lineWidth = 2;
+      ctx.strokeRect(selection.x, selection.y, selection.width, selection.height);
     };
 
     processButton.addEventListener('click', () => {
@@ -73,8 +102,27 @@
         return;
       }
 
-      // Convertir la imagen del canvas a un blob para ajustar el tamaño del archivo
-      canvas.toBlob(
+      // Crear un canvas temporal para el recorte
+      const tempCanvas = document.createElement('canvas');
+      const tempCtx = tempCanvas.getContext('2d');
+      tempCanvas.width = selection.width;
+      tempCanvas.height = selection.height;
+
+      // Recortar y redimensionar la imagen
+      tempCtx.drawImage(
+        img,
+        selection.x,
+        selection.y,
+        selection.width,
+        selection.height,
+        0,
+        0,
+        selection.width,
+        selection.height
+      );
+
+      // Convertir la imagen procesada a un blob y verificar tamaño
+      tempCanvas.toBlob(
         (blob) => {
           if (blob.size > 50 * 1024) {
             alert('La imagen procesada excede los 50 KB. Intenta con otra.');
@@ -88,7 +136,7 @@
           }
         },
         'image/png',
-        0.9 // Calidad de compresión (ajustar si es necesario)
+        0.9 // Calidad de compresión
       );
     });
   </script>
