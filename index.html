@@ -8,23 +8,34 @@
     body {
       font-family: Arial, sans-serif;
       margin: 20px;
-    }
-    .container {
-      max-width: 600px;
-      margin: 0 auto;
       text-align: center;
     }
-    .crop-area {
+    .container {
+      max-width: 700px;
+      margin: 0 auto;
+    }
+    .image-container {
       position: relative;
+      width: 500px;
+      height: 500px;
       margin: 20px auto;
-      width: 240px;
-      height: 288px;
       border: 1px solid #ccc;
       overflow: hidden;
     }
-    .crop-area img {
+    .image-container img {
       position: absolute;
-      cursor: grab;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: auto;
+      cursor: move;
+    }
+    .crop-box {
+      position: absolute;
+      width: 240px;
+      height: 288px;
+      border: 2px dashed #000;
+      pointer-events: none;
     }
     button {
       padding: 10px 20px;
@@ -42,8 +53,9 @@
     <h1>Procesador de Imágenes</h1>
     <input type="file" id="fileInput" accept="image/*">
     <button onclick="document.getElementById('fileInput').click()">Cargar Imagen</button>
-    <div class="crop-area" id="cropArea">
+    <div class="image-container" id="imageContainer">
       <img id="uploadedImage" src="" alt="">
+      <div class="crop-box" id="cropBox"></div>
     </div>
     <button onclick="processImage()" id="processButton" disabled>Procesar Imagen</button>
   </div>
@@ -51,13 +63,15 @@
   <script>
     const fileInput = document.getElementById('fileInput');
     const uploadedImage = document.getElementById('uploadedImage');
-    const cropArea = document.getElementById('cropArea');
+    const imageContainer = document.getElementById('imageContainer');
+    const cropBox = document.getElementById('cropBox');
     const processButton = document.getElementById('processButton');
 
-    let isDragging = false;
+    let cropBoxX = 130, cropBoxY = 106; // Posición inicial del cuadro de recorte
+    let imageX = 0, imageY = 0;
+    let isDraggingImage = false;
+    let isDraggingCropBox = false;
     let startX, startY;
-    let imgX = 0, imgY = 0;
-    let scale = 1;
 
     fileInput.addEventListener('change', (event) => {
       const file = event.target.files[0];
@@ -65,45 +79,45 @@
         const reader = new FileReader();
         reader.onload = () => {
           uploadedImage.src = reader.result;
-          uploadedImage.style.transform = `translate(0px, 0px) scale(1)`;
-          imgX = 0;
-          imgY = 0;
-          scale = 1;
+          uploadedImage.style.transform = 'translate(0px, 0px)';
           processButton.disabled = false;
+          cropBox.style.left = `${cropBoxX}px`;
+          cropBox.style.top = `${cropBoxY}px`;
         };
         reader.readAsDataURL(file);
       }
     });
 
+    // Drag the image
     uploadedImage.addEventListener('mousedown', (event) => {
-      isDragging = true;
-      startX = event.clientX - imgX;
-      startY = event.clientY - imgY;
-      uploadedImage.style.cursor = 'grabbing';
+      isDraggingImage = true;
+      startX = event.clientX - imageX;
+      startY = event.clientY - imageY;
     });
 
     document.addEventListener('mousemove', (event) => {
-      if (isDragging) {
-        imgX = event.clientX - startX;
-        imgY = event.clientY - startY;
-        uploadedImage.style.transform = `translate(${imgX}px, ${imgY}px) scale(${scale})`;
+      if (isDraggingImage) {
+        imageX = event.clientX - startX;
+        imageY = event.clientY - startY;
+        uploadedImage.style.transform = `translate(${imageX}px, ${imageY}px)`;
+      } else if (isDraggingCropBox) {
+        cropBoxX = event.clientX - startX;
+        cropBoxY = event.clientY - startY;
+        cropBox.style.left = `${cropBoxX}px`;
+        cropBox.style.top = `${cropBoxY}px`;
       }
     });
 
     document.addEventListener('mouseup', () => {
-      isDragging = false;
-      uploadedImage.style.cursor = 'grab';
+      isDraggingImage = false;
+      isDraggingCropBox = false;
     });
 
-    cropArea.addEventListener('wheel', (event) => {
-      event.preventDefault();
-      const zoomStep = 0.1;
-      if (event.deltaY < 0) {
-        scale += zoomStep;
-      } else {
-        scale = Math.max(1, scale - zoomStep);
-      }
-      uploadedImage.style.transform = `translate(${imgX}px, ${imgY}px) scale(${scale})`;
+    // Drag the crop box
+    cropBox.addEventListener('mousedown', (event) => {
+      isDraggingCropBox = true;
+      startX = event.clientX - cropBoxX;
+      startY = event.clientY - cropBoxY;
     });
 
     function processImage() {
@@ -116,15 +130,17 @@
       img.src = uploadedImage.src;
 
       img.onload = () => {
-        const imgWidth = img.width * scale;
-        const imgHeight = img.height * scale;
+        const scaleX = img.width / uploadedImage.clientWidth;
+        const scaleY = img.height / uploadedImage.clientHeight;
 
-        const offsetX = (cropArea.offsetWidth / 2) - (imgWidth / 2) - imgX;
-        const offsetY = (cropArea.offsetHeight / 2) - (imgHeight / 2) - imgY;
+        const offsetX = (cropBoxX - imageX) * scaleX;
+        const offsetY = (cropBoxY - imageY) * scaleY;
+        const cropWidth = 240 * scaleX;
+        const cropHeight = 288 * scaleY;
 
         ctx.drawImage(
           img,
-          offsetX, offsetY, imgWidth, imgHeight,
+          offsetX, offsetY, cropWidth, cropHeight,
           0, 0, canvas.width, canvas.height
         );
 
