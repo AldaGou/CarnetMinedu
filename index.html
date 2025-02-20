@@ -17,8 +17,8 @@
     .crop-area {
       position: relative;
       margin: 20px auto;
-      width: 300px;
-      height: 300px;
+      width: 240px;
+      height: 288px;
       border: 1px solid #ccc;
       overflow: hidden;
     }
@@ -47,6 +47,7 @@
       <img id="uploadedImage" src="" alt="">
     </div>
     <button onclick="processImage()" id="processButton" disabled>Procesar Imagen</button>
+    <p id="error" style="color: red; display: none;"></p>
   </div>
 
   <script>
@@ -54,12 +55,21 @@
     const uploadedImage = document.getElementById('uploadedImage');
     const cropArea = document.getElementById('cropArea');
     const processButton = document.getElementById('processButton');
+    const errorElement = document.getElementById('error');
 
-    let cropData = { x: 0, y: 0, width: 300, height: 300 };
+    let cropData = { x: 0, y: 0, width: 240, height: 288 };
 
     fileInput.addEventListener('change', (event) => {
       const file = event.target.files[0];
       if (file) {
+        if (file.size < 4 * 1024 || file.size > 50 * 1024) {
+          errorElement.textContent = "El tamaño de la imagen debe estar entre 4 KB y 50 KB.";
+          errorElement.style.display = "block";
+          return;
+        } else {
+          errorElement.style.display = "none";
+        }
+
         const reader = new FileReader();
         reader.onload = () => {
           uploadedImage.src = reader.result;
@@ -91,8 +101,8 @@
 
     function processImage() {
       const canvas = document.createElement('canvas');
-      canvas.width = cropData.width;
-      canvas.height = cropData.height;
+      canvas.width = 240;
+      canvas.height = 288;
       const ctx = canvas.getContext('2d');
       const img = new Image();
       img.src = uploadedImage.src;
@@ -101,7 +111,7 @@
         ctx.drawImage(
           img,
           cropData.x, cropData.y, cropData.width, cropData.height,
-          0, 0, cropData.width, cropData.height
+          0, 0, 240, 288
         );
 
         canvas.toBlob((blob) => {
@@ -109,7 +119,7 @@
           link.href = URL.createObjectURL(blob);
           link.download = 'processed-image.png';
           link.click();
-        }, 'image/png');
+        }, 'image/png', 1);
       };
     }
   </script>
