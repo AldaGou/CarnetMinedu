@@ -1,144 +1,117 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Editor de Imágenes con Recorte</title>
-  <style>
-    body {
-      font-family: Arial, sans-serif;
-      text-align: center;
-      padding: 20px;
-    }
-    .container {
-      max-width: 700px;
-      margin: 0 auto;
-    }
-    canvas {
-      border: 1px solid #ddd;
-      margin-top: 20px;
-      cursor: crosshair;
-    }
-    input, button {
-      margin-top: 10px;
-    }
-  </style>
-</head>
-<body>
-  <div class="container">
-    <h1>Editor de Imágenes con Recorte</h1>
-    <p>Sube una imagen y selecciona el área que deseas procesar:</p>
-    <ul>
-      <li><strong>Dimensiones del recorte:</strong> 240x288 píxeles</li>
-      <li><strong>Tamaño máximo de archivo:</strong> 50 KB</li>
-      <li><strong>Resolución:</strong> 300 DPI</li>
-    </ul>
-    <input type="file" id="imageInput" accept="image/*">
-    <canvas id="canvas"></canvas>
-    <button id="processButton">Procesar Imagen</button>
-    <a id="downloadLink" style="display:none;">Descargar Imagen Procesada</a>
-  </div>
+import React, { useRef, useState } from "react";
+import { Button } from "@/components/ui/button";
+import Cropper from "react-easy-crop";
+import { getCroppedImg } from "./utils/cropImage";
 
-  <script>
-    const imageInput = document.getElementById('imageInput');
-    const processButton = document.getElementById('processButton');
-    const canvas = document.getElementById('canvas');
-    const ctx = canvas.getContext('2d');
-    const downloadLink = document.getElementById('downloadLink');
+const ImageProcessor = () => {
+  const fileInputRef = useRef(null);
+  const [imageSrc, setImageSrc] = useState(null);
+  const [croppedAreaPixels, setCroppedAreaPixels] = useState(null);
+  const [crop, setCrop] = useState({ x: 0, y: 0 });
+  const [zoom, setZoom] = useState(1);
 
-    let img = new Image();
-    let isDragging = false;
-    let selection = { x: 0, y: 0, width: 240, height: 288 }; // Dimensiones del recorte
+  const onFileChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = () => setImageSrc(reader.result);
+      reader.readAsDataURL(file);
+    }
+  };
 
-    imageInput.addEventListener('change', (event) => {
-      const file = event.target.files[0];
-      if (file) {
-        const reader = new FileReader();
-        reader.onload = (e) => {
-          img.src = e.target.result;
-        };
-        reader.readAsDataURL(file);
-      }
-    });
+  const onCropComplete = (croppedArea, croppedAreaPixels) => {
+    setCroppedAreaPixels(croppedAreaPixels);
+  };
 
+  const processImage = async () => {
+    if (!croppedAreaPixels || !imageSrc) return;
+
+    const croppedImage = await getCroppedImg(imageSrc, croppedAreaPixels, 300);
+    const blob = await fetch(croppedImage).then((res) => res.blob());
+
+    if (blob.size > 50 * 1024) {
+      alert("La imagen procesada excede los 50KB. Prueba recortando más o reduciendo detalles.");
+      return;
+    }
+
+    const downloadLink = document.createElement("a");
+    downloadLink.href = croppedImage;
+    downloadLink.download = "processed-image.png";
+    downloadLink.click();
+  };
+
+  return (
+    <div className="p-4">
+      <h1 className="text-xl font-bold mb-4">Procesador de Imágenes</h1>
+      <input
+        type="file"
+        accept="image/*"
+        ref={fileInputRef}
+        className="hidden"
+        onChange={onFileChange}
+      />
+      <Button onClick={() => fileInputRef.current.click()}>Cargar Imagen</Button>
+
+      {imageSrc && (
+        <div className="relative mt-4" style={{ width: 240, height: 288 }}>
+          <Cropper
+            image={imageSrc}
+            crop={crop}
+            zoom={zoom}
+            aspect={240 / 288}
+            onCropChange={setCrop}
+            onZoomChange={setZoom}
+            onCropComplete={onCropComplete}
+          />
+        </div>
+      )}
+
+      <Button
+        onClick={processImage}
+        disabled={!imageSrc}
+        className="mt-4"
+      >
+        Procesar Imagen
+      </Button>
+    </div>
+  );
+};
+
+export default ImageProcessor;
+
+// utils/cropImage.js
+export const getCroppedImg = (imageSrc, crop, dpi = 300) => {
+  const canvas = document.createElement("canvas");
+  const scale = dpi / 96;
+
+  canvas.width = crop.width * scale;
+  canvas.height = crop.height * scale;
+  const ctx = canvas.getContext("2d");
+
+  const img = new Image();
+  img.src = imageSrc;
+
+  return new Promise((resolve) => {
     img.onload = () => {
-      // Ajustar el canvas al tamaño de la imagen cargada
-      canvas.width = img.width;
-      canvas.height = img.height;
-      ctx.drawImage(img, 0, 0);
-    };
-
-    canvas.addEventListener('mousedown', (e) => {
-      isDragging = true;
-      const rect = canvas.getBoundingClientRect();
-      selection.x = e.clientX - rect.left;
-      selection.y = e.clientY - rect.top;
-      drawSelection();
-    });
-
-    canvas.addEventListener('mousemove', (e) => {
-      if (isDragging) {
-        const rect = canvas.getBoundingClientRect();
-        selection.x = e.clientX - rect.left - selection.width / 2;
-        selection.y = e.clientY - rect.top - selection.height / 2;
-        ctx.drawImage(img, 0, 0);
-        drawSelection();
-      }
-    });
-
-    canvas.addEventListener('mouseup', () => {
-      isDragging = false;
-    });
-
-    const drawSelection = () => {
-      ctx.strokeStyle = 'red';
-      ctx.lineWidth = 2;
-      ctx.strokeRect(selection.x, selection.y, selection.width, selection.height);
-    };
-
-    processButton.addEventListener('click', () => {
-      if (!img.src) {
-        alert('Primero sube una imagen.');
-        return;
-      }
-
-      // Crear un canvas temporal para el recorte
-      const tempCanvas = document.createElement('canvas');
-      const tempCtx = tempCanvas.getContext('2d');
-      tempCanvas.width = selection.width;
-      tempCanvas.height = selection.height;
-
-      // Recortar y redimensionar la imagen
-      tempCtx.drawImage(
+      ctx.drawImage(
         img,
-        selection.x,
-        selection.y,
-        selection.width,
-        selection.height,
+        crop.x * scale,
+        crop.y * scale,
+        crop.width * scale,
+        crop.height * scale,
         0,
         0,
-        selection.width,
-        selection.height
+        canvas.width,
+        canvas.height
       );
 
-      // Convertir la imagen procesada a un blob y verificar tamaño
-      tempCanvas.toBlob(
+      canvas.toBlob(
         (blob) => {
-          if (blob.size > 50 * 1024) {
-            alert('La imagen procesada excede los 50 KB. Intenta con otra.');
-          } else {
-            // Mostrar el enlace para descargar la imagen
-            const url = URL.createObjectURL(blob);
-            downloadLink.href = url;
-            downloadLink.download = 'imagen_procesada.png';
-            downloadLink.textContent = 'Descargar Imagen Procesada';
-            downloadLink.style.display = 'block';
-          }
+          resolve(URL.createObjectURL(blob));
         },
-        'image/png',
-        0.9 // Calidad de compresión
+        "image/png",
+        1
       );
-    });
-  </script>
-</body>
-</html>
+    };
+  });
+};
