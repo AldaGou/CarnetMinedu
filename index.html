@@ -55,21 +55,12 @@
     const uploadedImage = document.getElementById('uploadedImage');
     const cropArea = document.getElementById('cropArea');
     const processButton = document.getElementById('processButton');
-    const errorElement = document.getElementById('error');
 
     let cropData = { x: 0, y: 0, width: 240, height: 288 };
 
     fileInput.addEventListener('change', (event) => {
       const file = event.target.files[0];
       if (file) {
-        if (file.size < 4 * 1024 || file.size > 50 * 1024) {
-          errorElement.textContent = "El tamaño de la imagen debe estar entre 4 KB y 50 KB.";
-          errorElement.style.display = "block";
-          return;
-        } else {
-          errorElement.style.display = "none";
-        }
-
         const reader = new FileReader();
         reader.onload = () => {
           uploadedImage.src = reader.result;
@@ -115,11 +106,7 @@
         );
 
         canvas.toBlob((blob) => {
-          if (blob.size > 50 * 1024) {
-            compressImage(blob, 0.9);
-          } else {
-            downloadImage(blob);
-          }
+          compressImage(blob, 1);
         }, 'image/jpeg', 1);
       };
     }
