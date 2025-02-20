@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Image Formatter</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pica/8.1.0/pica.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            text-align: center;
+        }
+        input {
+            margin: 10px 0;
+        }
+        canvas {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <h1>Image Formatter</h1>
+    <p>Carga una imagen, y el sistema la ajustará a 240x288 px, 300 dpi y menos de 50 KB.</p>
+
+    <input type="file" id="upload" accept="image/*">
+    <button id="process">Procesar Imagen</button>
+    <a id="download" download="formatted-image.png" style="display: none;">Descargar Imagen</a>
+
+    <canvas id="canvas"></canvas>
+
+    <script>
+        const uploadInput = document.getElementById('upload');
+        const processButton = document.getElementById('process');
+        const downloadLink = document.getElementById('download');
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+
+        processButton.addEventListener('click', async () => {
+            if (!uploadInput.files[0]) {
+                alert('Por favor, selecciona una imagen primero.');
+                return;
+            }
+
+            const file = uploadInput.files[0];
+            const img = new Image();
+            const reader = new FileReader();
+
+            reader.onload = () => {
+                img.src = reader.result;
+            };
+
+            img.onload = async () => {
+                // Redimensionar la imagen a 240x288 px
+                const pica = window.pica();
+                canvas.width = 240;
+                canvas.height = 288;
+
+                const offscreenCanvas = document.createElement('canvas');
+                offscreenCanvas.width = img.width;
+                offscreenCanvas.height = img.height;
+                const offscreenCtx = offscreenCanvas.getContext('2d');
+                offscreenCtx.drawImage(img, 0, 0);
+
+                await pica.resize(offscreenCanvas, canvas);
+
+                // Ajustar a 300 dpi y comprimir para que no supere los 50 KB
+                let quality = 0.9; // Comienza con alta calidad
+                let blob;
+
+                do {
+                    blob = await new Promise(resolve =>
+                        canvas.toBlob(resolve, 'image/jpeg', quality)
+                    );
+                    quality -= 0.05; // Reduce calidad iterativamente
+                } while (blob.size > 50000 && quality > 0.1);
+
+                // Mostrar enlace de descarga
+                const url = URL.createObjectURL(blob);
+                downloadLink.href = url;
+                downloadLink.style.display = 'inline';
+                downloadLink.textContent = 'Descargar Imagen';
+            };
+
+            reader.readAsDataURL(file);
+        });
+    </script>
+</body>
+</html>
